@@ -1,4 +1,5 @@
 import { useDrawing } from '../state/drawingStore.tsx'
+import { PublishButton } from './PublishButton.tsx'
 
 type Props = {
   providers: string[]
@@ -29,7 +30,11 @@ export function Toolbar({ providers }: Props) {
             onChange={(e) =>
               dispatch({ type: 'SET_PROVIDER', provider: e.target.value })
             }
-            disabled={state.isGenerating || state.previewMode}
+            disabled={
+              state.isGenerating ||
+              state.isGlobalChatting ||
+              state.previewMode
+            }
           >
             {providers.map((id) => (
               <option key={id} value={id}>
@@ -45,7 +50,7 @@ export function Toolbar({ providers }: Props) {
             state.previewMode ? 'btn btn--primary' : 'btn btn--ghost'
           }
           onClick={() => dispatch({ type: 'TOGGLE_PREVIEW' })}
-          disabled={state.isGenerating}
+          disabled={state.isGenerating || state.isGlobalChatting}
           aria-pressed={state.previewMode}
           title="Toggle preview (T)"
         >
@@ -63,7 +68,11 @@ export function Toolbar({ providers }: Props) {
           type="button"
           className="btn btn--ghost"
           onClick={() => dispatch({ type: 'CLEAR_INK' })}
-          disabled={state.isGenerating || state.previewMode}
+          disabled={
+            state.isGenerating ||
+            state.isGlobalChatting ||
+            state.previewMode
+          }
         >
           Clear ink
         </button>
@@ -71,10 +80,15 @@ export function Toolbar({ providers }: Props) {
           type="button"
           className="btn btn--ghost"
           onClick={() => dispatch({ type: 'CLEAR_PAGE' })}
-          disabled={state.isGenerating || state.previewMode}
+          disabled={
+            state.isGenerating ||
+            state.isGlobalChatting ||
+            state.previewMode
+          }
         >
           Reset page
         </button>
+        <PublishButton />
       </div>
 
       {state.error ? (
@@ -98,9 +112,11 @@ export function Toolbar({ providers }: Props) {
             ? 'preview'
             : state.isGenerating
               ? 'generating…'
-              : state.openStrokes.length > 0
-                ? `${state.openStrokes.length} stroke(s) open`
-                : 'ready'}
+              : state.isGlobalChatting
+                ? 'global chat…'
+                : state.openStrokes.length > 0
+                  ? `${state.openStrokes.length} stroke(s) open`
+                  : 'ready'}
         </span>
       </div>
     </header>

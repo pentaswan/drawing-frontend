@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { buildSystemPrompt, buildUserPrompt } from './prompt.ts'
+import { buildSystemPrompt, buildUserPrompt, jsonShapeHint } from './prompt.ts'
 import { parseOperationsJson } from './schema.ts'
 import type { GenerateRequest, GenerateResponse, VisionProvider } from './types.ts'
 
@@ -78,7 +78,7 @@ export function createAnthropicProvider(): VisionProvider {
               },
               {
                 type: 'text',
-                text: `${buildUserPrompt(req)}\n\nJSON shape: {"operations":[{"op":"add|replace|remove","groupId":"...","targetId":null,"html":"... or null","align":"left|center|right|null","script":"optional JS with root or null","anchorId":null,"position":"before|after|end|null"}]}`,
+                text: `${buildUserPrompt(req)}\n\n${jsonShapeHint()}`,
               },
             ],
           },

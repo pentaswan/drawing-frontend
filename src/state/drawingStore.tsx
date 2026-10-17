@@ -9,6 +9,7 @@ import {
 import { strokesBBox, type BBox, type Point, type Stroke } from '../lib/geometry.ts'
 import type { Align } from '../lib/layout.ts'
 import type { AppliedPageOp } from '../lib/pageOps.ts'
+import { getSessionId } from '../lib/session.ts'
 
 const MAX_HISTORY = 50
 
@@ -35,6 +36,7 @@ export type HistorySnapshot = {
   labelDraft: string
   showPrompt: boolean
   generatedElements: GeneratedElement[]
+  pageCss: string
 }
 
 export type DrawingState = {
@@ -45,7 +47,10 @@ export type DrawingState = {
   showPrompt: boolean
   labelDraft: string
   generatedElements: GeneratedElement[]
+  pageCss: string
+  sessionId: string
   isGenerating: boolean
+  isGlobalChatting: boolean
   previewMode: boolean
   error: string | null
   provider: string
@@ -65,6 +70,7 @@ type Action =
   | { type: 'TOGGLE_PREVIEW' }
   | { type: 'SET_PREVIEW'; enabled: boolean }
   | { type: 'GENERATE_START' }
+  | { type: 'GLOBAL_CHAT_START' }
   | { type: 'APPLY_OPERATIONS'; operations: AppliedPageOp[] }
   | { type: 'GENERATE_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
@@ -98,6 +104,7 @@ function takeSnapshot(state: DrawingState): HistorySnapshot {
     labelDraft: state.labelDraft,
     showPrompt: state.showPrompt,
     generatedElements: state.generatedElements,
+    pageCss: state.pageCss,
   }
 }
 
@@ -108,10 +115,16 @@ function pushHistory(state: DrawingState): DrawingState {
 
 function applyOperations(
   elements: GeneratedElement[],
+  pageCss: string,
   operations: AppliedPageOp[],
-): GeneratedElement[] {
+): { elements: GeneratedElement[]; pageCss: string } {
   let next = [...elements]
+  let css = pageCss
   for (const op of operations) {
+    if (op.op === 'pageStyle') {
+      css = op.css
+      continue
+    }
     if (op.op === 'remove') {
       next = next.filter((el) => el.id !== op.targetId)
       continue
@@ -144,7 +157,7 @@ function applyOperations(
     }
     next = [...next.slice(0, insertAt), created, ...next.slice(insertAt)]
   }
-  return next
+  return { elements: next, pageCss: css }
 }
 
 export const initialDrawingState: DrawingState = {
@@ -155,7 +168,10 @@ export const initialDrawingState: DrawingState = {
   showPrompt: false,
   labelDraft: '',
   generatedElements: [],
+  pageCss: '',
+  sessionId: '',
   isGenerating: false,
+  isGlobalChatting: false,
   previewMode: false,
   error: null,
   provider: 'perceptron',
@@ -165,7 +181,9 @@ export const initialDrawingState: DrawingState = {
 export function drawingReducer(state: DrawingState, action: Action): DrawingState {
   switch (action.type) {
     case 'POINTER_DOWN':
-      if (state.previewMode || state.isGenerating) return state
+      if (state.previewMode || state.isGenerating || state.isGlobalChatting) {
+        return state
+      }
       return {
         ...state,
         isDrawing: true,
@@ -237,10 +255,12 @@ export function drawingReducer(state: DrawingState, action: Action): DrawingStat
         labelDraft: prev.labelDraft,
         showPrompt: prev.openStrokes.length > 0,
         generatedElements: prev.generatedElements,
+        pageCss: prev.pageCss,
         history: state.history.slice(0, -1),
         currentPoints: null,
         isDrawing: false,
         isGenerating: false,
+        isGlobalChatting: false,
         error: null,
       }
     }
@@ -267,6 +287,7 @@ export function drawingReducer(state: DrawingState, action: Action): DrawingStat
       const withHistory = pushHistory(state)
       return {
         ...initialDrawingState,
+        sessionId: state.sessionId,
         provider: state.provider,
         history: withHistory.history,
       }
@@ -286,26 +307,44 @@ export function drawingReducer(state: DrawingState, action: Action): DrawingStat
         showPrompt: false,
         previewMode: false,
       }
+    case 'GLOBAL_CHAT_START':
+      return {
+        ...state,
+        isGlobalChatting: true,
+        error: null,
+      }
     case 'APPLY_OPERATIONS': {
+      if (action.operations.length === 0) {
+        return {
+          ...state,
+          isGenerating: false,
+          isGlobalChatting: false,
+        }
+      }
       const withHistory = pushHistory(state)
+      const applied = applyOperations(
+        state.generatedElements,
+        state.pageCss,
+        action.operations,
+      )
       return {
         ...withHistory,
         isGenerating: false,
+        isGlobalChatting: false,
         sealedGroups: [],
         openStrokes: [],
         currentPoints: null,
         showPrompt: false,
         labelDraft: '',
-        generatedElements: applyOperations(
-          state.generatedElements,
-          action.operations,
-        ),
+        generatedElements: applied.elements,
+        pageCss: applied.pageCss,
       }
     }
     case 'GENERATE_ERROR':
       return {
         ...state,
         isGenerating: false,
+        isGlobalChatting: false,
         error: action.error,
         showPrompt: state.openStrokes.length > 0,
       }
@@ -326,7 +365,10 @@ type DrawingContextValue = {
 const DrawingContext = createContext<DrawingContextValue | null>(null)
 
 export function DrawingProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(drawingReducer, initialDrawingState)
+  const [state, dispatch] = useReducer(drawingReducer, undefined, () => ({
+    ...initialDrawingState,
+    sessionId: getSessionId(),
+  }))
 
   const value = useMemo<DrawingContextValue>(() => {
     const liveStroke = state.currentPoints
@@ -335,6 +377,7 @@ export function DrawingProvider({ children }: { children: ReactNode }) {
     const openBBox = strokesBBox([...state.openStrokes, ...liveStroke])
     const canUndo =
       !state.isGenerating &&
+      !state.isGlobalChatting &&
       !state.previewMode &&
       (state.history.length > 0 || Boolean(state.currentPoints))
 

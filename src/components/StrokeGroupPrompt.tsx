@@ -48,6 +48,7 @@ export function StrokeGroupPrompt({
         overlayRef,
         provider: state.provider,
         group,
+        pageCss: state.pageCss,
       })
       dispatch({ type: 'APPLY_OPERATIONS', operations })
     } catch (error) {

@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { DrawingOverlay, type DrawingOverlayHandle } from './components/DrawingOverlay.tsx'
+import { GlobalChat } from './components/GlobalChat.tsx'
 import { PageDocument } from './components/PageDocument.tsx'
+import { PublishedSite } from './components/PublishedSite.tsx'
 import { StrokeGroupPrompt } from './components/StrokeGroupPrompt.tsx'
 import { Toolbar } from './components/Toolbar.tsx'
 import { fetchProviders } from './lib/api.ts'
+import { publishedSlugFromPath } from './lib/slug.ts'
 import { DrawingProvider, useDrawing } from './state/drawingStore.tsx'
 import './App.css'
 
@@ -62,7 +65,7 @@ function Stage() {
       if (typing || event.metaKey || event.ctrlKey || event.altKey) return
 
       if (event.key === 't' || event.key === 'T') {
-        if (state.isGenerating) return
+        if (state.isGenerating || state.isGlobalChatting) return
         event.preventDefault()
         dispatch({ type: 'TOGGLE_PREVIEW' })
       }
@@ -70,7 +73,12 @@ function Stage() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [dispatch, state.previewMode, state.isGenerating])
+  }, [
+    dispatch,
+    state.previewMode,
+    state.isGenerating,
+    state.isGlobalChatting,
+  ])
 
   return (
     <div className={`app-shell${state.previewMode ? ' app-shell--preview' : ''}`}>
@@ -83,12 +91,29 @@ function Stage() {
           containerWidth={size.width}
           containerHeight={size.height}
         />
+        <GlobalChat />
       </div>
     </div>
   )
 }
 
 export default function App() {
+  const [slug, setSlug] = useState(() =>
+    publishedSlugFromPath(window.location.pathname),
+  )
+
+  useEffect(() => {
+    const onPopState = () => {
+      setSlug(publishedSlugFromPath(window.location.pathname))
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  if (slug) {
+    return <PublishedSite slug={slug} />
+  }
+
   return (
     <DrawingProvider>
       <Stage />

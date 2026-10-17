@@ -27,7 +27,16 @@ export type PageOpRemove = {
   targetId: string
 }
 
-export type AppliedPageOp = PageOpAdd | PageOpReplace | PageOpRemove
+export type PageOpStyle = {
+  op: 'pageStyle'
+  css: string
+}
+
+export type AppliedPageOp =
+  | PageOpAdd
+  | PageOpReplace
+  | PageOpRemove
+  | PageOpStyle
 
 export function findInsertIndex(drawY: number, layout: LayoutItem[]): number {
   for (let i = 0; i < layout.length; i++) {

@@ -23,6 +23,13 @@ export type ExistingElement = {
   yMid: number
 }
 
+export type BackendRoute = {
+  path: string
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+  code: string
+  dependencies?: string[]
+}
+
 export type GenerateRequest = {
   imageBase64: string
   pageWidth: number
@@ -30,6 +37,17 @@ export type GenerateRequest = {
   groups: LabeledGroup[]
   existingElements?: ExistingElement[]
   existingHtml?: string
+  pageCss?: string
+  sessionId?: string
+  provider?: string
+}
+
+export type GlobalChatRequest = {
+  message: string
+  existingElements?: ExistingElement[]
+  existingHtml?: string
+  pageCss?: string
+  sessionId?: string
   provider?: string
 }
 
@@ -57,9 +75,16 @@ export type PageOperation =
       groupId: string
       targetId: string
     }
+  | {
+      op: 'pageStyle'
+      groupId: string
+      /** CSS applied under `.site` (and optional `:root` vars). */
+      css: string
+    }
 
 export type GenerateResponse = {
   operations: PageOperation[]
+  backend?: BackendRoute[]
 }
 
 export interface VisionProvider {
